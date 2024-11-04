@@ -1,6 +1,7 @@
 const wss = require("ws");
 const {Tools, ActivePlayers} = require("./utils");
 const jwt = require("jsonwebtoken");
+const allowed_hosts = ['https://thehackerclown.github.io']
 
 process.loadEnvFile('.env')
 
@@ -42,14 +43,27 @@ function login_connect(ws,msg) {
             fire(ws, 1, "Connection Successful");
             break;
         case 100:
-            const auth = authenticateUser(msg.data.token, msg.data.tokpass);
-            if (auth == true) {
-                const uid = Tool.createtoken(msg.data.token);
-                ActUser.add(ws,uid,msg.data.token.toString());
-                fire(ws, 101, uid);
-                console.log(`${ActUser.getuser(ws)} logged in`)
-            } else {
-                fire(ws, 110, "Username or Password is Incorrect")
+            if (msg.uid != null) {
+                if (ActUser.exists(msg.uid)) {
+                    if (ActUser.isonline(msg.uid)) {
+                        fire(ws, 110, 'you wanna die?')
+                    } else {
+                        ActUser.setws(msg.uid, ws);
+                        fire(ws, 101, msg.uid);
+                    }
+                } else {
+                    fire(ws, 110, "don't even try boi")
+                }
+            }  else {
+                const auth = authenticateUser(msg.data.token, msg.data.tokpass);
+                if (auth == true) {
+                    const uid = Tool.createtoken(msg.data.token);
+                    ActUser.add(ws,uid,msg.data.token.toString());
+                    fire(ws, 101, uid);
+                    console.log(`${ActUser.getuser(ws)} logged in`)
+                } else {
+                    fire(ws, 110, "Username or Password is Incorrect")
+                }
             }
             break;
         default:
@@ -92,7 +106,6 @@ db.on("connection", (ws) => {
         if (msg.code != 1 && msg.code != 100) {
             if (msg.uid != null) {
                     const decoded = Tool.verify(msg.uid);
-                    console.log(decoded);
                     if (decoded!="Error") {
 
                         coderun(ws, msg);
@@ -120,6 +133,7 @@ db.on("connection", (ws) => {
 
     ws.on("close",()=>{
         console.log(`${ActUser.getuser(ws)} disconnected`);
-        ActUser.remove(ws);
+        ActUser.setstatus(ws, false);
+        ActUser.refresh();
     });
 });

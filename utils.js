@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 class Tools {
     constructor () {
         this.to = "sha256"
-        this.tokenexpire = 4
+        this.tokenexpire = 
         this.secret = process.env.DBCROPSUBTLE
     }
     
@@ -46,6 +46,7 @@ class ActivePlayers {
         const payload = new Map();
         payload.set('username', username);
         payload.set('ws',websocket);
+        payload.set('online',true);
         this.data.set(userid, payload);
     }
     getuser(id) {
@@ -93,10 +94,60 @@ class ActivePlayers {
         }
         return found!='' ? found : undefined;
     }
+    setws(uid,ws) {
+        this.data.get(uid).set('ws',ws);
+        this.setstatus(uid, true);
+    }
+    refresh() {
+        for (const [k,v] of this.data.entries()) {
+            try{
+                const decoded = jwt.verify(k);
+            } catch (e) {
+                if (!(v.get('online'))) {
+                    this.remove(k);
+                }
+            }
+        }
+    }
 
+    isonline(id) {
+        switch (this.regex.test(id)) {
+            case true:
+                return this.data.get(id).get('online');
+                break;
+            case false:
+                let found = false;
+                for (const v of this.data.values()) {
+                    if (v.get('ws') == id) {
+                        found = v.get('online');
+                    }
+                }
+                return found;
+                break;
+            default:
+                break;
+        }
+    }
+
+    setstatus(id, flag) {
+        switch (this.regex.test(id)) {
+            case true:
+                this.data.get(id).set('online',flag);
+                break;
+            case false:
+                for (const v of this.data.values()) {
+                    if (v.get('ws') == id) {
+                        v.set('online', flag);
+                    }
+                }
+                break;
+            default:
+                break;
+        }
+    }
 
     exists(id) {
-        switch (this.regex.test(id)) {
+        switch (id && this.regex.test(id)) {
             case true:
                 return this.data.has(id);
                 break;
