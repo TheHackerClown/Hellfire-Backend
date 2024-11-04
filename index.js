@@ -45,9 +45,9 @@ function login_connect(ws,msg) {
             const auth = authenticateUser(msg.data.token, msg.data.tokpass);
             if (auth == true) {
                 const uid = Tool.createtoken(msg.data.token);
-                console.log(uid);
-                ActUser.add(ws,uid,msg.data.token);
+                ActUser.add(ws,uid,msg.data.token.toString());
                 fire(ws, 101, uid);
+                console.log(`${ActUser.getuser(ws)} logged in`)
             } else {
                 fire(ws, 110, "Username or Password is Incorrect")
             }
@@ -57,6 +57,7 @@ function login_connect(ws,msg) {
             break;
     }
 }
+
 
 //Logic for incoming messages
 function coderun(ws, msg) {
@@ -117,14 +118,8 @@ db.on("connection", (ws) => {
     });
 
 
-    ws.on("close",(ws)=>{
-        console.log(ActUser.existsws(ws))
-        console.log(ActUser.getwsuser(ws))
-        if (ActUser.existsws(ws)) {
-            console.log(`${ActUser.getwsuser(ws)} disconnected`)
-        } else {
-            console.log("Player Disconnected")
-        }
-        ActUser.remove(ws)
+    ws.on("close",()=>{
+        console.log(`${ActUser.getuser(ws)} disconnected`);
+        ActUser.remove(ws);
     });
 });

@@ -39,92 +39,82 @@ class Tools {
 
 class ActivePlayers {
     constructor(){
-        this.data = {}
+        this.data = new Map();
+        this.regex = /^[\w-]+\.[\w-]+\.[\w-]+$/
     }
     add(websocket, userid, username) {
-        const payload = {username:username,ws:websocket};
-        this.data[userid] = payload;
+        const payload = new Map();
+        payload.set('username', username);
+        payload.set('ws',websocket);
+        this.data.set(userid, payload);
     }
-    getuser(uid) {
-        try {
-            return this.data[uid].username;   
-        } catch (error) {
-            return undefined;
-        }
-    }
-    remove(ws) {
-        for (let [key, value] of Object.entries(this.data)) {
-            if (value.ws == ws) {
-                delete this.data[key];
+    getuser(id) {
+        switch (this.regex.test(id)) {
+            case true:
+                return this.data.get(id) != undefined ? this.data.get(id).get('username') : 'Player';
                 break;
-            }
+            case false:
+                for (const entry of this.data.values()) {
+                    if (entry.get('ws') == id) {
+                        return entry.get('username');
+                    }
+                }
+                return 'Player';
+                break;
+            default:
+                break;
         }
     }
-
-    getwsuser(ws) {
-        let found = '';
-        for (let [key, value] of Object.entries(this.data)) {
-            if (value.ws == ws) {
-                found = value.username;
+    remove(id) {
+        switch (this.regex.test(id)) {
+            case true:
+                this.data.delete(id);
                 break;
-            }
-        }
-        if (found!= '') {
-            return found;
-        } else {
-            return undefined;
+            case false:
+                for (const [k,v] of this.data.entries()) {
+                    if (v.get('ws') == id) {
+                        this.data.delete(v);
+                        this.data.delete(k);
+                        
+                    }
+                }
+                break;
+            default:
+                break;
         }
     }
     
     getuid(ws) {
         let found = '';
-        for (let [key, value] of Object.entries(this.data)) {
-            if (value.ws == ws) {
-                found = key;
-                break;
+        for (const [k,v] of this.data.entries()){
+            if (v.get('ws') == ws) {
+                found = k;
             }
         }
-        if (found!= '') {
-            return found;
-        } else {
-            return undefined;
-        }
-    }
-    existsuid(uid) {
-        let found = 0;
-        for (let [key, value] of Object.entries(this.data)) {
-            if (key == uid) {
-                found++;
-                break;
-            }
-        }
-        if (found==1) {
-            return true;
-        } else {
-            return false;
-        }
+        return found!='' ? found : undefined;
     }
 
-    existsws(ws) {
-        let found = 0;
-        for (let [key, value] of Object.entries(this.data)) {
-            if (value.ws == ws) {
-                found++;
+
+    exists(id) {
+        switch (this.regex.test(id)) {
+            case true:
+                return this.data.has(id);
                 break;
-            }
-        }
-        if (found==1) {
-            return true;
-        } else {
-            return false;
+            case false:
+                let found = false;
+                for (const v of this.data.values()) {
+                    if (v.get('ws') == id) {
+                        found = true;
+                    }
+                }
+                return found;
+                break;
+            default:
+                break;
         }
     }
     getws(uid) {
-        try {
-            return this.data[uid].ws;   
-        } catch (error) {
-            return undefined;
-        }
+        return this.data.get(uid) != undefined ? this.data.get(uid).get('ws') : undefined;
     }
 }
 
