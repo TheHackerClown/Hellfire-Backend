@@ -21,6 +21,7 @@ const db = new wss.WebSocketServer({
 const userdb = {"dhruv":"dhruv"}
 
 function authenticateUser(username, password) {
+    if (!username || !password) return false;
     if (userdb[username] != undefined) {
         if (userdb[username]== password) {
             return true;
@@ -43,24 +44,20 @@ function login_connect(ws,msg) {
             fire(ws, 1, "Connection Successful");
             break;
         case 100:
-            if (msg.uid != null) {
-                if (ActUser.exists(msg.uid)) {
-                    if (ActUser.isonline(msg.uid)) {
-                        fire(ws, 110, 'you wanna die?')
-                    } else {
-                        ActUser.setws(msg.uid, ws);
-                        fire(ws, 101, msg.uid);
-                    }
-                } else {
-                    fire(ws, 110, "don't even try boi")
-                }
-            }  else {
+            console.log(msg.uid, ActUser.exists(msg.uid), !ActUser.isonline(msg.uid))
+            
+            console.log('when relogin initiated',ActUser.data);
+            if (msg.uid && ActUser.exists(msg.uid) && !ActUser.isonline(msg.uid)) {
+                ActUser.setstatus(msg.uid, true);
+                ActUser.setws(msg.uid, ws);
+                fire(ws,101,{uid:msg.uid});
+            } else {
                 const auth = authenticateUser(msg.data.token, msg.data.tokpass);
                 if (auth == true) {
                     const uid = Tool.createtoken(msg.data.token);
                     ActUser.add(ws,uid,msg.data.token.toString());
-                    fire(ws, 101, uid);
-                    console.log(`${ActUser.getuser(ws)} logged in`)
+                    fire(ws, 101, {uid:uid,username:msg.data.token});
+                    console.log(`${ActUser.getuser(ws)} logged in`);
                 } else {
                     fire(ws, 110, "Username or Password is Incorrect")
                 }
@@ -100,18 +97,14 @@ function coderun(ws, msg) {
 db.on("connection", (ws) => {
     console.log('Player Connected');
     ws.on('message', (data) => {
-
         const msg = JSON.parse(data);
 
         if (msg.code != 1 && msg.code != 100) {
             if (msg.uid != null) {
                     const decoded = Tool.verify(msg.uid);
                     if (decoded!="Error") {
-
                         coderun(ws, msg);
-
                     } else {
-
                         fire(ws,110,"Error with Login")    
                     
                     }
@@ -132,8 +125,7 @@ db.on("connection", (ws) => {
 
 
     ws.on("close",()=>{
-        console.log(`${ActUser.getuser(ws)} disconnected`);
         ActUser.setstatus(ws, false);
-        ActUser.refresh();
+        console.log(`${ActUser.getuser(ws)} disconnected`);
     });
 });

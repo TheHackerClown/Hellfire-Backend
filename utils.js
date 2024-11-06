@@ -4,7 +4,6 @@ const jwt = require("jsonwebtoken");
 class Tools {
     constructor () {
         this.to = "sha256"
-        this.tokenexpire = 
         this.secret = process.env.DBCROPSUBTLE
     }
     
@@ -21,7 +20,7 @@ class Tools {
     verify(token) {
         let decoded = 'Error';
         try {
-            decoded = jwt.verify(token, this.secret,{ expiresIn: `${this.tokenexpire}h` });
+            decoded = jwt.verify(token, this.secret);
         } catch (error) {
             decoded = "Error"
         } finally {
@@ -50,38 +49,28 @@ class ActivePlayers {
         this.data.set(userid, payload);
     }
     getuser(id) {
-        switch (this.regex.test(id)) {
-            case true:
-                return this.data.get(id) != undefined ? this.data.get(id).get('username') : 'Player';
-                break;
-            case false:
-                for (const entry of this.data.values()) {
-                    if (entry.get('ws') == id) {
-                        return entry.get('username');
-                    }
+        if (typeof id === 'string' && this.regex.test(id)) {
+            return this.data.get(id) != undefined ? this.data.get(id).get('username') : 'Player';
+        } else {
+            for (const entry of this.data.values()) {
+                if (entry.get('ws') == id) {
+                    return entry.get('username');
                 }
-                return 'Player';
-                break;
-            default:
-                break;
+            }
+            return 'Player';
         }
     }
     remove(id) {
-        switch (this.regex.test(id)) {
-            case true:
-                this.data.delete(id);
-                break;
-            case false:
-                for (const [k,v] of this.data.entries()) {
-                    if (v.get('ws') == id) {
-                        this.data.delete(v);
-                        this.data.delete(k);
-                        
-                    }
+        if (typeof id === 'string' && this.regex.test(id)) {
+            this.data.delete(id);
+        } else {
+            for (const [k,v] of this.data.entries()) {
+                if (v.get('ws') == id) {
+                    this.data.delete(v);
+                    this.data.delete(k);
+                    
                 }
-                break;
-            default:
-                break;
+            }
         }
     }
     
@@ -96,72 +85,49 @@ class ActivePlayers {
     }
     setws(uid,ws) {
         this.data.get(uid).set('ws',ws);
-        this.setstatus(uid, true);
-    }
-    refresh() {
-        for (const [k,v] of this.data.entries()) {
-            try{
-                const decoded = jwt.verify(k);
-            } catch (e) {
-                if (!(v.get('online'))) {
-                    this.remove(k);
-                }
-            }
-        }
     }
 
     isonline(id) {
-        switch (this.regex.test(id)) {
-            case true:
-                return this.data.get(id).get('online');
-                break;
-            case false:
-                let found = false;
+        if (typeof id === 'string' && this.regex.test(id)) {
+
+            // Please Note, this.data.has(id) will work only in if else or ternary operator
+            return this.data.has(id) ? this.data.get(id).get('online') : undefined;
+        } else {
+            let found = false;
                 for (const v of this.data.values()) {
                     if (v.get('ws') == id) {
                         found = v.get('online');
                     }
                 }
-                return found;
-                break;
-            default:
-                break;
+            return found;
         }
     }
 
     setstatus(id, flag) {
-        switch (this.regex.test(id)) {
-            case true:
-                this.data.get(id).set('online',flag);
-                break;
-            case false:
-                for (const v of this.data.values()) {
-                    if (v.get('ws') == id) {
-                        v.set('online', flag);
-                    }
+        if (typeof id === 'string' && this.regex.test(id)) {
+            this.data.get(id).set('online',flag);
+        } else {
+            for (const v of this.data.values()) {
+                if (v.get('ws') == id) {
+                    v.set('online', flag);
                 }
-                break;
-            default:
-                break;
+            }
         }
     }
 
     exists(id) {
-        switch (id && this.regex.test(id)) {
-            case true:
-                return this.data.has(id);
-                break;
-            case false:
-                let found = false;
+        if (typeof id === 'string' && this.regex.test(id)) {
+
+            // Please Note, this.data.has(id) will work only in if else or ternary operator
+            return this.data.has(id) ? true : false ;
+        } else {
+            let found = false;
                 for (const v of this.data.values()) {
                     if (v.get('ws') == id) {
                         found = true;
                     }
                 }
-                return found;
-                break;
-            default:
-                break;
+            return found;
         }
     }
     getws(uid) {
