@@ -3,6 +3,7 @@ const keycodes = {
     100:`login from user`,
     101:`to return new uid and add it to database`,
     110:`to return error during login`,
+    111: `log out request`,
     120:`to get all bullet fired, human interaction etc and values`,
     121:`to return all bullet fired etc to all users`,
     190:`to get chats`,

@@ -18,7 +18,7 @@ const db = new wss.WebSocketServer({
     protocols: ['json']
 });
 
-const userdb = {"dhruv":"dhruv"}
+const userdb = {"admin":"admin"}
 
 function authenticateUser(username, password) {
     if (!username || !password) return false;
@@ -44,13 +44,12 @@ function login_connect(ws,msg) {
             fire(ws, 1, "Connection Successful");
             break;
         case 100:
-            console.log(msg.uid, ActUser.exists(msg.uid), !ActUser.isonline(msg.uid))
-            
-            console.log('when relogin initiated',ActUser.data);
             if (msg.uid && ActUser.exists(msg.uid) && !ActUser.isonline(msg.uid)) {
                 ActUser.setstatus(msg.uid, true);
                 ActUser.setws(msg.uid, ws);
-                fire(ws,101,{uid:msg.uid});
+                const decode = Tool.verify(msg.uid);
+                fire(ws,101,{uid:msg.uid,username: decode.username});
+                console.log(`${ActUser.getuser(ws)} logged in`);
             } else {
                 const auth = authenticateUser(msg.data.token, msg.data.tokpass);
                 if (auth == true) {
@@ -61,6 +60,12 @@ function login_connect(ws,msg) {
                 } else {
                     fire(ws, 110, "Username or Password is Incorrect")
                 }
+            }
+            break;
+        case 111:
+            if (msg.uid && ActUser.exists(msg.uid) && ActUser.isonline(msg.uid)) {
+                ActUser.remove(msg.uid);
+                fire(ws,111, 'Logged Out');
             }
             break;
         default:
@@ -99,7 +104,7 @@ db.on("connection", (ws) => {
     ws.on('message', (data) => {
         const msg = JSON.parse(data);
 
-        if (msg.code != 1 && msg.code != 100) {
+        if (msg.code > 111) {
             if (msg.uid != null) {
                     const decoded = Tool.verify(msg.uid);
                     if (decoded!="Error") {
