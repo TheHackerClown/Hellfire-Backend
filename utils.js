@@ -5,6 +5,8 @@ const { check } = require("prisma");
 
 class Tools {
     #secret;
+    #MAPCHUNK;
+    #COMBINECHUNK;
     constructor() {
         this.to = "sha256";
         this.#secret = process.env.DBCROPSUBTLE;
@@ -27,14 +29,13 @@ class Tools {
             return decoded;
         }
     }
-    MAPGEN(blocksize, columns, rowcurr = 3, colcurr = 0) {
-        let map = new Array(columns);// Map Array
+    #MAPCHUNK(columns, rows, rowcurr = 8, colcurr = 0) {
+        let map = new Array(rows);// Map Array
 
-        //Strict Checking for Out Of Map Coordinates
-        const isdefined = (map, row, col) => { return map[row] !== undefined && map[row][col] !== undefined; }
+
         //Blank Space Flood Fill
         for (let i = 0; i < rows; i++) {
-            map[i] = new Array(columns).fill(1);
+            map[i] = new Array(columns).fill(0);
         }
         //Starting Point
         map[rowcurr][colcurr] = 0;
@@ -43,44 +44,135 @@ class Tools {
 
         //Looping Path Tracer until end point contains column 3
         while (1 != found) {
-            for (let j = 0; j < blocksize * 2; j++) {
+            for (let j = 0; j < 40 * 2; j++) {
                 let value = Math.floor(Math.random() * dir.length);//Random Index For Direction Array
                 value = value == 3 ? 2 : value; // Rare Case Check
                 let [dr, dc] = dir[value];//Random Direction
                 if (isdefined(map, rowcurr + dr, colcurr + dc) && colcurr + dc >= 0 && colcurr + dc < columns) {
                     rowcurr += dr; colcurr += dc;//Move Pointer
-                    map[rowcurr][colcurr] = 0;//Fill Path
+                    map[rowcurr][colcurr] = 1;//Fill Path
                     if (isdefined(map, rowcurr, colcurr + dc)) {
-                        map[rowcurr][colcurr + dc] = 0//Adding FLood while continuing towards the right direction
+                        map[rowcurr][colcurr + dc] = 1//Adding FLood while continuing towards the right direction
                     }
                 }
 
             }
-            if (map[3][columns - 1] == 0) {
+
+            if (map[8][columns - 1] == 1) {
                 found++;
                 break;
             }
         }
 
         //End Filter, to remove garbage values
-        for (let j = 0; j < rows; j++) {
-            while (map[j].length > columns) {
-                map[j].pop()
+        for (let i = 0; i < rows; i++) {
+            for (let j = 0; j < columns; j++) {
+                if (map[i][j] === 0 && isdefined(map, i - 1, j) && map[i - 1][j] == 1) {
+                    map[i][j] = 1;
+                }
             }
         }
-        map[4][0] == 0;
-        map[2][0] == 0;
-        map[4][columns - 1] == 0;
-        map[2][columns - 1] == 0;
+
+        let fixed = 0;
+        let emptyset = new Array(columns).fill(0);
+        let downpadding = new Array(columns).fill(1);
+        while (fixed < 1) {
+            for (let i = 0; i < rows; i++) {
+                let result = map[i].every((value) => { value === 1 });
+                if (result) {
+                    map = map.filter((_, ind) => { ind !== i });
+                    map.unshift(emptyset);
+                } else { fixed += 1; }
+            }
+        }
+        if (!map[rows - 1].every((val => val === 1))) {
+            map.push(downpadding);
+        }
+        for (let j = 0; j < 5; j++) {
+            map[j] = emptyset;
+        }
+
+        for (let j = 0; j < rows; j++) {
+            while (map[j].length > columns) {
+                map[j].pop();
+            }
+        }
+        while (map.length > rows) {
+            map.shift();
+        }
+
         return map;
+    }
+    #COMBINECHUNK() {
+        const dimensions = [12,25]; // [total rows, total columns]
+        const arrays = [this.#MAPCHUNK(dimensions[1],dimensions[0]),this.#MAPCHUNK(dimensions[1],dimensions[0]),this.#MAPCHUNK(dimensions[1],dimensions[0]),this.#MAPCHUNK(dimensions[1],dimensions[0]),this.#MAPCHUNK(dimensions[1],dimensions[0])]
+        const rows = arrays[0].length; // Number of rows
+        const cols = arrays.reduce((sum, array) => sum + array[0].length, 0); // Total width
+        const combined = [];
+
+        for (let i = 0; i < rows; i++) {
+            const row = [];
+            for (const array of arrays) {
+                row.push(...array[i]);
+            }
+            combined.push(row);
+        }
+        // for (let j = 0; j < cols; j++) {
+        //     for (let i = 0; j < rows; i++) {
+        //         if (isdefined(combined, i, j) && combined[i][j] === 0) {
+        //             if (isdefined(combined, i, j - 1) && isdefined(combined, i, j + 1) && combined[i][j + 1] === 1 && combined[i][j - 1] === 1) {
+        //                 combined[i][j] = 1;
+        //             } else if (!isdefined(combined, i, j - 1) && isdefined(combined, i, j + 1) && combined[i][j + 1] === 1) {
+        //                 combined[i][j] = 1;
+        //             } else if (isdefined(combined, i, j - 1) && !isdefined(combined, i, j + 1) && combined[i][j - 1] === 1) {
+        //                 combined[i][j] = 1;
+        //             }
+        //         }
+        //     }
+        // }
+        return combined;
+    }
+    MAPGEN() {
+        const array = this.#COMBINECHUNK();
+        const rows = array.length;
+        const cols = array[0].length;
+        const columnCounts = Array(cols).fill(0);
+
+        // Count the number of 1s in each column
+        for (let i = 0; i < rows; i++) {
+            for (let j = 0; j < cols; j++) {
+                if (array[i][j] === 1) {
+                    columnCounts[j]++;
+                }
+            }
+        }
+
+        // Keep only columns where the count of 1s is not exactly 2
+        // AND exclude the first and last column
+        const filteredArray = array.map(row => {
+            return row.filter((_, colIndex) =>
+                colIndex !== 0 && // Exclude first column
+                colIndex !== cols - 1 && // Exclude last column
+                columnCounts[colIndex] > 2 // Exclude columns with more than two black blocks
+            );
+        });
+        
+        //Limit Rows to 100 for Hellfire
+        for (let rows = 0;rows < filteredArray.length; rows++) {
+            while (filteredArray[rows].length > 100) {
+                filteredArray[rows].pop();
+            }
+        }
+        return filteredArray;
     }
 }
 
 class ActivePlayers {
     #data;
+    #regex;
     constructor() {
         this.#data = new Map();
-        this.regex = /^[\w-]+\.[\w-]+\.[\w-]+$/
+        this.#regex = /^[\w-]+\.[\w-]+\.[\w-]+$/
     }
     add(websocket, userid, username) {
         const payload = new Map();
@@ -90,7 +182,7 @@ class ActivePlayers {
         this.#data.set(userid, payload);
     }
     getuser(id) {
-        if (typeof id === 'string' && this.regex.test(id)) {
+        if (typeof id === 'string' && this.#regex.test(id)) {
             return this.#data.get(id) != undefined ? this.#data.get(id).get('username') : 'Player';
         } else {
             for (const entry of this.#data.values()) {
@@ -102,7 +194,7 @@ class ActivePlayers {
         }
     }
     remove(id) {
-        if (typeof id === 'string' && this.regex.test(id)) {
+        if (typeof id === 'string' && this.#regex.test(id)) {
             this.#data.delete(id);
         } else {
             for (const [k, v] of this.#data.entries()) {
@@ -141,7 +233,7 @@ class ActivePlayers {
     }
 
     isonline(id) {
-        if (typeof id === 'string' && this.regex.test(id)) {
+        if (typeof id === 'string' && this.#regex.test(id)) {
 
             // Please Note, this.#data.has(id) will work only in if else or ternary operator
             return this.#data.has(id) ? this.#data.get(id).get('online') : undefined;
@@ -157,7 +249,7 @@ class ActivePlayers {
     }
 
     setstatus(id, flag) {
-        if (typeof id === 'string' && this.regex.test(id)) {
+        if (typeof id === 'string' && this.#regex.test(id)) {
             this.#data.get(id).set('online', flag);
         } else {
             for (const v of this.#data.values()) {
@@ -169,7 +261,7 @@ class ActivePlayers {
     }
 
     exists(id) {
-        if (typeof id === 'string' && this.regex.test(id)) {
+        if (typeof id === 'string' && this.#regex.test(id)) {
 
             // Please Note, this.#data.has(id) will work only in if else or ternary operator
             return this.#data.has(id) ? true : false;
